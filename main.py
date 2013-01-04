@@ -18,30 +18,9 @@ import webapp2
 import urllib
 import urllib2
 from google.appengine.api import urlfetch
-from bs4 import BeautifulSoup
-#import BeautifulSoup
 import logging
-from webapp2_extras import routes
 import urlparse
 import re
-
-def getBaseUri(uri):
-    idx = uri.rfind('/')
-    pidx = uri.find('://')
-    if idx == -1 :
-        return uri
-    if idx == pidx+2 :
-        return uri
-    return uri[:idx]
-
-
-def getTopUri(uri):
-    pidx = uri.find('://')
-    uri2 = uri[pidx+3:]
-    idx = uri2.find('/')
-    if idx == -1 :
-        return uri
-    return '%s%s'%(uri[:pidx+3],uri2[:idx])
 
 def replaceDomain(origin):
     domainList = set()
@@ -67,37 +46,6 @@ def replaceDomain(origin):
     return changed
 
 
-def convertHTML(origin):
-    soup = BeautifulSoup(origin)
-    #soup = BeautifulSoup.BeautifulSoup(origin)
-    
-
-
-    links = soup.findAll(attrs={'href':True})
-    for link in links :
-        if link['href'].startswith('http') :
-            hostname = urlparse.urlparse(link['href']).hostname
-            url_info = link['href'].split(hostname)
-            new_url = '%s%s.web-relay.appspot.com%s'%(url_info[0],hostname, url_info[1])
-            link['href'] = new_url
-            
-    tags = soup.findAll(attrs={'src':True})
-    for tag in tags :
-        if tag['src'].startswith('http') :
-            hostname = urlparse.urlparse(tag['src']).hostname
-            url_info = tag['src'].split(hostname)
-            new_url = '%s%s.web-relay.appspot.com%s'%(url_info[0],hostname, url_info[1])
-            tag['src'] = new_url
- 
-    tags = soup.findAll(attrs={'action':True})
-    for tag in tags :
-        if tag['action'].startswith('http') :
-            hostname = urlparse.urlparse(tag['action']).hostname
-            url_info = tag['action'].split(hostname)
-            new_url = '%s%s.web-relay.appspot.com%s'%(url_info[0],hostname, url_info[1])
-            tag['action'] = new_url
- 
-    return soup.renderContents()
 
 class MainHandler(webapp2.RequestHandler):
     def get(self):
@@ -132,8 +80,6 @@ class MainHandler(webapp2.RequestHandler):
             self.response.write(response.content)
             return
 
-        #self.response.write(convertHTML(response.content))
-        #self.response.write(replaceDomain(convertHTML(response.content)))
         self.response.write(replaceDomain(response.content))
 
     def post(self):
@@ -161,8 +107,6 @@ class MainHandler(webapp2.RequestHandler):
         if response.headers.has_key('Content-Type') and not response.headers['Content-Type'].startswith("text") :
             self.response.write(response.content)
             return
-        #self.response.write(convertHTML(response.content))
-        #self.response.write(replaceDomain(convertHTML(response.content)))
         self.response.write(replaceDomain(response.content))
 
 app = webapp2.WSGIApplication([
