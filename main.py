@@ -23,6 +23,7 @@ from bs4 import BeautifulSoup
 import logging
 from webapp2_extras import routes
 import urlparse
+import re
 
 def getBaseUri(uri):
     idx = uri.rfind('/')
@@ -42,6 +43,28 @@ def getTopUri(uri):
         return uri
     return '%s%s'%(uri[:pidx+3],uri2[:idx])
 
+def replaceDomain(origin):
+    domainList = set()
+    pattern = r'[\'" ]+(http://([^\/\'\" ]+))'
+    #pattern = r'(http://([^\/ ]+))'
+    p = re.compile(pattern)
+    r = p.findall(origin)
+    for domain in r :
+        if domain[1].find('web-relay.appspot.com') == -1 :
+            domainList.add(domain[0])
+    
+    #pattern = r'(https://([^\/ ]+))'
+    pattern = r'[\'" ]+(https://([^\/\'\" ]+))'
+    p = re.compile(pattern)
+    r = p.findall(origin)
+    for domain in r :
+        if domain[1].find('web-relay.appspot.com') == -1 :
+            domainList.add(domain[0])
+
+    changed = origin
+    for item in domainList : 
+        changed = changed.replace(item, '%s.web-relay.appspot.com'%(item))
+    return changed
 
 
 def convertHTML(origin):
@@ -85,6 +108,8 @@ class MainHandler(webapp2.RequestHandler):
             if not url :        
                 self.response.write('URL:<form action=/><input type=text name=rq value=http://></form>')
                 return
+            url = path_qs.split('rq=')[-1]
+            url = url.replace('%3A',':').replace('%2F','/')
             hostname = urlparse.urlparse(url).hostname
             url_info = url.split(hostname)
             new_url = '%s%s.web-relay.appspot.com%s'%(url_info[0], hostname, url_info[1])
@@ -93,15 +118,23 @@ class MainHandler(webapp2.RequestHandler):
         
         new_url = '%s%s'%(base_domain, path_qs)
 
+        headers = self.request.headers
+        for header in headers.keys():
+            if header == 'Host' or header == 'Referer':
+                headers[header] = headers[header].replace('.web-relay.appspot.com','')
+
         response = urlfetch.fetch(url=new_url, 
                                   method=urlfetch.GET,
-                                  headers=self.request.headers)
+                                  headers=headers)
+
         self.response.headers = response.headers
         if response.headers.has_key('Content-Type') and not response.headers['Content-Type'].startswith("text") :
             self.response.write(response.content)
             return
 
-        self.response.write(convertHTML(response.content))
+        #self.response.write(convertHTML(response.content))
+        #self.response.write(replaceDomain(convertHTML(response.content)))
+        self.response.write(replaceDomain(response.content))
 
     def post(self):
         base_domain = self.request.host_url.replace('.web-relay.appspot.com','')
@@ -112,17 +145,25 @@ class MainHandler(webapp2.RequestHandler):
 
         new_url = '%s%s'%(base_domain, path_qs)
 
+        headers = self.request.headers
+        for header in headers.keys():
+            if header == 'Host' or header == 'Referer':
+                headers[header] = headers[header].replace('.web-relay.appspot.com','')
+
+
         args = urllib.urlencode(self.request.POST)
         response = urlfetch.fetch(url=new_url, 
                                   payload=args,
                                   method=urlfetch.POST,
-                                  headers=self.request.headers)
+                                  headers=headers)
+
         self.response.headers = response.headers
         if response.headers.has_key('Content-Type') and not response.headers['Content-Type'].startswith("text") :
             self.response.write(response.content)
             return
-        self.response.write(convertHTML(response.content))
-
+        #self.response.write(convertHTML(response.content))
+        #self.response.write(replaceDomain(convertHTML(response.content)))
+        self.response.write(replaceDomain(response.content))
 
 app = webapp2.WSGIApplication([
     ('.*', MainHandler),
